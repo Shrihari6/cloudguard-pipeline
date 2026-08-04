@@ -1,0 +1,134 @@
+import { NodeRegistryItem, NodeType, SidebarGroupCategory } from '@/types';
+
+export const NODE_REGISTRY: Record<NodeType, NodeRegistryItem> = {
+  kinesis: {
+    type: 'kinesis',
+    label: 'Kinesis Data Streams',
+    desc: 'Real-time streaming data ingestion at scale',
+    category: 'Ingestion',
+    color: '#FF9900',
+    abbrev: 'KIN',
+  },
+  s3: {
+    type: 's3',
+    label: 'S3 Bucket',
+    desc: 'Scalable object storage for raw or processed data',
+    category: 'Ingestion',
+    color: '#3F8624',
+    abbrev: 'S3',
+  },
+  sqs: {
+    type: 'sqs',
+    label: 'SQS Queue',
+    desc: 'Fully managed message queuing service',
+    category: 'Ingestion',
+    color: '#FF4F8B',
+    abbrev: 'SQS',
+  },
+  lambda: {
+    type: 'lambda',
+    label: 'Lambda Function',
+    desc: 'Serverless event-driven compute execution',
+    category: 'Processing',
+    color: '#FF9900',
+    abbrev: 'LAM',
+  },
+  glue: {
+    type: 'glue',
+    label: 'Glue ETL Job',
+    desc: 'Serverless data integration & ETL processing',
+    category: 'Processing',
+    color: '#8C4FFF',
+    abbrev: 'GLU',
+  },
+  emr: {
+    type: 'emr',
+    label: 'EMR Cluster',
+    desc: 'Big data processing using Apache Spark & Hadoop',
+    category: 'Processing',
+    color: '#C0392B',
+    abbrev: 'EMR',
+  },
+  rds: {
+    type: 'rds',
+    label: 'RDS Database',
+    desc: 'Managed relational database engine',
+    category: 'Storage',
+    color: '#527FFF',
+    abbrev: 'RDS',
+  },
+  dynamodb: {
+    type: 'dynamodb',
+    label: 'DynamoDB Table',
+    desc: 'Fast, flexible NoSQL key-value database',
+    category: 'Storage',
+    color: '#527FFF',
+    abbrev: 'DYN',
+  },
+  redshift: {
+    type: 'redshift',
+    label: 'Redshift Warehouse',
+    desc: 'Cloud data warehouse for analytics',
+    category: 'Storage',
+    color: '#8C4FFF',
+    abbrev: 'RED',
+  },
+  iam: {
+    type: 'iam',
+    label: 'IAM Role',
+    desc: 'Secure identity & access control permissions',
+    category: 'Security',
+    color: '#DD344C',
+    abbrev: 'IAM',
+  },
+  kms: {
+    type: 'kms',
+    label: 'KMS Key',
+    desc: 'Managed key management for data encryption',
+    category: 'Security',
+    color: '#DD344C',
+    abbrev: 'KMS',
+  },
+  waf: {
+    type: 'waf',
+    label: 'WAF Rule',
+    desc: 'Web application firewall protecting endpoints',
+    category: 'Security',
+    color: '#DD344C',
+    abbrev: 'WAF',
+  },
+  cloudwatch: {
+    type: 'cloudwatch',
+    label: 'CloudWatch Logs',
+    desc: 'Monitoring and observability metrics/logs',
+    category: 'Observability',
+    color: '#FF9900',
+    abbrev: 'CW',
+  },
+  guardduty: {
+    type: 'guardduty',
+    label: 'GuardDuty Detector',
+    desc: 'Intelligent threat detection and continuous monitoring',
+    category: 'Observability',
+    color: '#DD344C',
+    abbrev: 'GD',
+  },
+};
+
+export function getSidebarGroups(): Array<{
+  category: SidebarGroupCategory;
+  items: NodeRegistryItem[];
+}> {
+  const categories: SidebarGroupCategory[] = [
+    'Ingestion',
+    'Processing',
+    'Storage',
+    'Security',
+    'Observability',
+  ];
+
+  return categories.map((category) => ({
+    category,
+    items: Object.values(NODE_REGISTRY).filter((item) => item.category === category),
+  }));
+}

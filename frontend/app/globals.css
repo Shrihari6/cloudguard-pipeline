@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
 }
 
+:root {
+  /* Surfaces */
+  --color-bg-primary: #1e1e1c;
+  --color-bg-secondary: #121212;
+  --color-bg-tertiary: #2a2a2a;
+
+  /* Text */
+  --color-text-primary: #e8e6de;
+  --color-text-secondary: #b4b2a9;
+  --color-text-muted: #888780;
+
+  /* Role text */
+  --color-text-info: #85b7eb;
+  --color-text-success: #c0dd97;
+  --color-text-warning: #fac775;
+  --color-text-danger: #f09595;
+
+  /* Borders */
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-border-stronger: rgba(255, 255, 255, 0.30);
+
+  /* Security check dot colours */
+  --color-check-iam: #DD344C;
+  --color-check-enc: #8C4FFF;
+  --color-check-detect: #FF9900;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sleek dark scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #121212;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+/* React Flow Connection Edge Lines */
+.react-flow__edge-path {
+  stroke: #38bdf8 !important;
+  stroke-width: 2.5px !important;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6)) !important;
+}
+
+/* React Flow MiniMap */
+.react-flow__minimap {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+/* React Flow Floating Controls */
+.react-flow__controls {
+  background: rgba(18, 18, 18, 0.7) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  fill: #e2e8f0 !important;
+  color: #e2e8f0 !important;
+  transition: background 0.15s ease !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
 }
