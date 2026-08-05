@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Documentation files (keep local only)
+*.docx
+*.pdf
+*.doc
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
