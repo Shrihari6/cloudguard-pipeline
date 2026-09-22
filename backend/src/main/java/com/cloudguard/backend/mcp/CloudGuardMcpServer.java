@@ -28,7 +28,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/mcp")
-@CrossOrigin(origins = "*")
 public class CloudGuardMcpServer {
 
     private final DeterministicRuleEngine ruleEngine;

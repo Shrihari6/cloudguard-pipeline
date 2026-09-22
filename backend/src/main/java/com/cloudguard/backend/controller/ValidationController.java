@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/pipeline")
-@CrossOrigin(origins = "*")
 public class ValidationController {
 
     private final DeterministicRuleEngine ruleEngine;
