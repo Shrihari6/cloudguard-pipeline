@@ -27,6 +27,8 @@ import { NODE_REGISTRY } from '@/lib/nodeRegistry';
 import { getChecksForNode } from '@/lib/securityRules';
 import { layoutPipeline } from '@/lib/layoutPipeline';
 
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081').replace(/\/+$/, '');
+
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-init',
@@ -321,7 +323,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       // Also trigger deterministic validation so metrics stay fresh
       get().validatePipeline();
 
-      const res = await fetch('http://localhost:8081/api/pipeline/chat', {
+      const res = await fetch(`${API_BASE_URL}/api/pipeline/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -352,7 +354,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       const errMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         sender: 'assistant',
-        text: '⚠️ Unable to connect to the CloudGuard Copilot service. Please ensure the backend is running on `http://localhost:8081`.',
+        text: `⚠️ Unable to connect to the CloudGuard Copilot service (${API_BASE_URL}). Please ensure the backend is running.`,
         suggestedActions: [
           'Validate Pipeline',
           'Why does Kinesis need an IAM Role connected?',
@@ -399,7 +401,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
         })),
       };
 
-      const res = await fetch('http://localhost:8081/api/pipeline/validate', {
+      const res = await fetch(`${API_BASE_URL}/api/pipeline/validate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
