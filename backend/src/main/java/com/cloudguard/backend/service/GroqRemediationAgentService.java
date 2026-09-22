@@ -39,13 +39,13 @@ public class GroqRemediationAgentService implements RemediationAgentService {
     private static final Logger log = LoggerFactory.getLogger(GroqRemediationAgentService.class);
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String DEFAULT_MODEL = "llama-3.3-70b-versatile";
+    private static final String DEFAULT_MODEL = "openai/gpt-oss-20b";
     private static final int MAX_HISTORY_MESSAGES = 20;
 
     @Value("${groq.api-key:}")
     private String apiKey;
 
-    @Value("${groq.model:llama-3.3-70b-versatile}")
+    @Value("${groq.model:openai/gpt-oss-20b}")
     private String modelId = System.getenv().getOrDefault("GROQ_MODEL", DEFAULT_MODEL);
 
     private final RestTemplate restTemplate = new RestTemplate();
