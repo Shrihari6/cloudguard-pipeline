@@ -118,6 +118,7 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
         if (!isApiKeyConfigured()) {
             log.info("Groq API key not configured — delegating to mock service");
+            System.err.println("[GROQ] API key is blank or placeholder — falling back to mock service");
             return fallbackService.chatWithCanvasContext(userMessage, metrics, graph, history);
         }
 
@@ -133,6 +134,7 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
             if (reply == null || reply.isBlank()) {
                 log.warn("Groq returned empty response — falling back to mock");
+                System.err.println("[GROQ] Empty response received — falling back to mock");
                 return fallbackService.chatWithCanvasContext(userMessage, metrics, graph, history);
             }
 
@@ -142,8 +144,15 @@ public class GroqRemediationAgentService implements RemediationAgentService {
             return new ChatResponseDTO(reply, suggestedActions);
 
         } catch (Exception e) {
+            String errMsg = "Groq Error: " + e.getMessage();
             log.error("Groq chatWithCanvasContext failed: {}", e.getMessage(), e);
-            return fallbackService.chatWithCanvasContext(userMessage, metrics, graph, history);
+            System.err.println("Groq Execution Failed: " + e.getMessage());
+            // Surface the error directly in the chat instead of silently falling back
+            return new ChatResponseDTO(errMsg, List.of(
+                    "Retry the question",
+                    "Validate Pipeline",
+                    "What is the AWS Shared Responsibility Model?"
+            ));
         }
     }
 
@@ -307,20 +316,28 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
         } catch (HttpClientErrorException e) {
             // 4xx errors from Groq (e.g. 401 invalid_api_key, 429 rate_limit)
+            String detail = e.getStatusCode().value() + " " + e.getStatusText()
+                    + " — " + e.getResponseBodyAsString();
             log.error("[GROQ] HTTP {} {} — Groq rejected the request.",
                     e.getStatusCode().value(), e.getStatusText());
             log.error("[GROQ] Response body from Groq: {}", e.getResponseBodyAsString());
+            System.err.println("Groq Execution Failed: " + detail);
             e.printStackTrace();
+            throw new RuntimeException("Groq API error: " + detail, e);
 
         } catch (RestClientException e) {
             // Network errors, timeouts, DNS failures
             log.error("[GROQ] Network/transport error reaching {}: {}", GROQ_API_URL, e.getMessage());
+            System.err.println("Groq Execution Failed: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Groq network error: " + e.getMessage(), e);
 
         } catch (Exception e) {
             // Unexpected errors (NPE, ClassCast on response shape, etc.)
             log.error("[GROQ] Unexpected error in callGroq: {}", e.getMessage());
+            System.err.println("Groq Execution Failed: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Groq unexpected error: " + e.getMessage(), e);
         }
         return null;
     }
