@@ -18,10 +18,29 @@ import {
   PipelineNodeData,
   SuggestionDTO,
   ValidationReportDTO,
+  CanvasMetricsResponseDTO,
+  ChatMessage,
+  ChatRequestDTO,
+  ChatResponseDTO,
 } from '@/types';
 import { NODE_REGISTRY } from '@/lib/nodeRegistry';
 import { getChecksForNode } from '@/lib/securityRules';
 import { layoutPipeline } from '@/lib/layoutPipeline';
+
+const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
+  {
+    id: 'msg-init',
+    sender: 'assistant',
+    text: "👋 **CloudGuard AI Copilot** is online!\n\nI monitor your live canvas topology for AWS security compliance across **Identity (IAM)**, **Encryption (KMS)**, and **Observability (CloudWatch)**.\n\nAdd nodes, connect edges, click **Validate Pipeline**, or pick a quick prompt below.",
+    suggestedActions: [
+      'Validate Pipeline',
+      'Why does Kinesis need an IAM Role connected?',
+      'How do I fix L2 Encryption?',
+      'Why did my score drop?',
+    ],
+    timestamp: 'Live',
+  },
+];
 
 export interface PipelineState {
   nodes: Node<PipelineNodeData>[];
@@ -29,7 +48,15 @@ export interface PipelineState {
   selectedNodeId: string | null;
   activePanelView: ActivePanelView;
   validationReport: ValidationReportDTO | null;
+  metricsResponse: CanvasMetricsResponseDTO | null;
+  isValidating: boolean;
   canvasTheme: CanvasTheme;
+
+  // Chat State
+  chatMessages: ChatMessage[];
+  isChatLoading: boolean;
+  sendChatMessage: (userMessage: string, isSystem?: boolean) => Promise<void>;
+  setActivePanelView: (view: ActivePanelView) => void;
 
   // React Flow state handlers
   onNodesChange: OnNodesChange;
@@ -49,6 +76,8 @@ export interface PipelineState {
   toggleSecurityCheck: (nodeId: string, checkId: string) => void;
   clearCanvas: () => void;
   setValidationReport: (report: ValidationReportDTO | null) => void;
+  setMetricsResponse: (metrics: CanvasMetricsResponseDTO | null) => void;
+  validatePipeline: () => Promise<CanvasMetricsResponseDTO | null>;
   setCanvasTheme: (theme: CanvasTheme) => void;
   acceptSuggestion: (suggestion: SuggestionDTO, defaultPosition?: { x: number; y: number }) => void;
 
@@ -62,9 +91,17 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
-  activePanelView: 'GLOBAL_REPORT',
+  activePanelView: 'CHAT',
   validationReport: null,
+  metricsResponse: null,
+  isValidating: false,
   canvasTheme: 'dark',
+  chatMessages: INITIAL_CHAT_MESSAGES,
+  isChatLoading: false,
+
+  setActivePanelView: (activePanelView: ActivePanelView) => {
+    set({ activePanelView });
+  },
 
   setCanvasTheme: (canvasTheme: CanvasTheme) => {
     set({ canvasTheme });
@@ -80,6 +117,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set((state) => ({
       edges: applyEdgeChanges(changes, state.edges),
     }));
+    const hasRemoval = changes.some((c) => c.type === 'remove');
+    if (hasRemoval) {
+      get().validatePipeline();
+    }
   },
 
   addNode: (type, position, origin = 'user') => {
@@ -111,8 +152,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set({
       nodes: [...currentNodes, newNode],
       selectedNodeId: id,
-      activePanelView: 'NODE_CHECKLIST',
+      activePanelView: get().activePanelView === 'CHAT' ? 'CHAT' : 'NODE_CHECKLIST',
     });
+
+    get().validatePipeline();
 
     return id;
   },
@@ -133,6 +176,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set({
       edges: updatedEdges,
     });
+
+    get().validatePipeline();
   },
 
   removeNode: (id) => {
@@ -147,8 +192,10 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       nodes: currentNodes,
       edges: currentEdges,
       selectedNodeId: isSelected ? null : get().selectedNodeId,
-      activePanelView: isSelected ? 'GLOBAL_REPORT' : get().activePanelView,
+      activePanelView: isSelected && get().activePanelView === 'NODE_CHECKLIST' ? 'CHAT' : get().activePanelView,
     });
+
+    get().validatePipeline();
   },
 
   removeEdge: (id) => {
@@ -157,6 +204,8 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     set({
       edges: currentEdges,
     });
+
+    get().validatePipeline();
   },
 
   triggerAutoLayout: () => {
@@ -176,7 +225,6 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
   selectNode: (id) => {
     set({
       selectedNodeId: id,
-      activePanelView: id ? 'NODE_CHECKLIST' : 'GLOBAL_REPORT',
     });
   },
 
@@ -222,9 +270,101 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       nodes: [],
       edges: [],
       selectedNodeId: null,
-      activePanelView: 'GLOBAL_REPORT',
+      activePanelView: 'CHAT',
       validationReport: null,
+      metricsResponse: null,
+      isValidating: false,
     });
+  },
+
+  sendChatMessage: async (userMessage: string, isSystem = false) => {
+    const trimmed = userMessage.trim();
+    if (!trimmed) return;
+
+    const userMsg: ChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      sender: isSystem ? 'system' : 'user',
+      text: userMessage,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    set((state) => ({
+      chatMessages: [...state.chatMessages, userMsg],
+      isChatLoading: true,
+      activePanelView: 'CHAT',
+    }));
+
+    try {
+      const { nodes, edges } = get();
+      const payload: ChatRequestDTO = {
+        userMessage,
+        graph: {
+          nodes: nodes.map((n) => ({
+            id: n.id,
+            type: n.data.type,
+            label: n.data.label,
+          })),
+          edges: edges.map((e) => ({
+            id: e.id,
+            source: e.source,
+            target: e.target,
+          })),
+        },
+        history: get()
+          .chatMessages.filter((m) => m.sender === 'user' || m.sender === 'assistant')
+          .map((m) => ({
+            role: m.sender === 'user' ? 'user' : 'assistant',
+            content: m.text,
+          })),
+      };
+
+      // Also trigger deterministic validation so metrics stay fresh
+      get().validatePipeline();
+
+      const res = await fetch('http://localhost:8081/api/pipeline/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Chat HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data: ChatResponseDTO = await res.json();
+
+      const assistantMsg: ChatMessage = {
+        id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        sender: 'assistant',
+        text: data.message,
+        suggestedActions: data.suggestedActions || [],
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      set((state) => ({
+        chatMessages: [...state.chatMessages, assistantMsg],
+        isChatLoading: false,
+      }));
+    } catch (err) {
+      console.warn('Chat request failed:', err);
+      const errMsg: ChatMessage = {
+        id: `err-${Date.now()}`,
+        sender: 'assistant',
+        text: '⚠️ Unable to connect to the CloudGuard Copilot service. Please ensure the backend is running on `http://localhost:8081`.',
+        suggestedActions: [
+          'Validate Pipeline',
+          'Why does Kinesis need an IAM Role connected?',
+          'How do I fix L2 Encryption?',
+        ],
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      set((state) => ({
+        chatMessages: [...state.chatMessages, errMsg],
+        isChatLoading: false,
+      }));
+    }
   },
 
   setValidationReport: (report) => {
@@ -232,6 +372,53 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
       validationReport: report,
       activePanelView: 'GLOBAL_REPORT',
     });
+  },
+
+  setMetricsResponse: (metricsResponse) => {
+    set({ metricsResponse });
+  },
+
+  validatePipeline: async () => {
+    const { nodes, edges } = get();
+    if (nodes.length === 0) {
+      set({ metricsResponse: null, isValidating: false });
+      return null;
+    }
+    set({ isValidating: true });
+    try {
+      const payload = {
+        nodes: nodes.map((n) => ({
+          id: n.id,
+          type: n.data.type,
+          label: n.data.label,
+        })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+        })),
+      };
+
+      const res = await fetch('http://localhost:8081/api/pipeline/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Validation HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const data: CanvasMetricsResponseDTO = await res.json();
+      set({ metricsResponse: data, isValidating: false });
+      return data;
+    } catch (err) {
+      console.warn('Backend validation request failed:', err);
+      set({ isValidating: false });
+      return null;
+    }
   },
 
   acceptSuggestion: (suggestion, defaultPosition = { x: 250, y: 150 }) => {

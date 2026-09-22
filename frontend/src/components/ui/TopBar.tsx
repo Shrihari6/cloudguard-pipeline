@@ -2,7 +2,25 @@ import React from 'react';
 import { usePipelineStore } from '@/hooks/usePipelineStore';
 
 export const TopBar: React.FC = () => {
-  const { clearCanvas, triggerAutoLayout, nodes } = usePipelineStore();
+  const {
+    clearCanvas,
+    triggerAutoLayout,
+    nodes,
+    isValidating,
+    metricsResponse,
+    sendChatMessage,
+    isChatLoading,
+    setActivePanelView,
+  } = usePipelineStore();
+
+  const totalPassed = metricsResponse?.totalPassedChecks ?? 0;
+  const totalPossible = metricsResponse?.totalPossibleChecks ?? 0;
+  const scorePercent = metricsResponse?.overallScorePercentage ?? 0;
+
+  const handleValidate = async () => {
+    setActivePanelView('CHAT');
+    await sendChatMessage('System: Validating current pipeline topology...', true);
+  };
 
   return (
     <header className="h-[48px] px-4 border-b border-black/10 dark:border-white/10 bg-[var(--color-bg-primary,#ffffff)] flex items-center justify-between shadow-2xs z-20">
@@ -15,13 +33,24 @@ export const TopBar: React.FC = () => {
           CloudGuard Pipeline
         </h1>
         <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-          Phase 2 Active
+          AI Copilot Active
         </span>
       </div>
 
-      {/* Center status info */}
-      <div className="text-xs text-gray-500 dark:text-gray-400">
-        Nodes on Canvas: <span className="font-medium text-gray-800 dark:text-gray-200">{nodes.length}</span>
+      {/* Center status info + Score Badge */}
+      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+        <div>
+          Nodes: <span className="font-medium text-gray-800 dark:text-gray-200">{nodes.length}</span>
+        </div>
+
+        {/* Global Overview Score Badge */}
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400"
+          title={`Overall Security Posture Score: ${scorePercent}%`}
+        >
+          <span>{totalPassed} / {totalPossible} 🛡️</span>
+          <span className="text-[10px] text-blue-300/80">({scorePercent}%)</span>
+        </div>
       </div>
 
       {/* Right Action buttons */}
@@ -42,10 +71,15 @@ export const TopBar: React.FC = () => {
           Clear Canvas
         </button>
         <button
-          onClick={() => alert('Validation engine will trigger in Phase 7!')}
-          className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs transition-colors"
+          onClick={handleValidate}
+          disabled={isValidating || isChatLoading || nodes.length === 0}
+          className="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+          title="Validate live canvas and get instant AI security breakdown"
         >
-          Validate Pipeline
+          {(isValidating || isChatLoading) && (
+            <span className="w-2.5 h-2.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          )}
+          <span>{isValidating || isChatLoading ? 'Validating...' : 'Validate Pipeline'}</span>
         </button>
       </div>
     </header>

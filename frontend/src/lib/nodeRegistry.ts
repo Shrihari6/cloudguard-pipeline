@@ -25,6 +25,46 @@ export const NODE_REGISTRY: Record<NodeType, NodeRegistryItem> = {
     color: '#FF4F8B',
     abbrev: 'SQS',
   },
+  sns: {
+    type: 'sns',
+    label: 'SNS Topic',
+    desc: 'Pub/sub messaging for event-driven notifications',
+    category: 'Ingestion',
+    color: '#D63B84',
+    abbrev: 'SNS',
+  },
+  eventbridge: {
+    type: 'eventbridge',
+    label: 'EventBridge Bus',
+    desc: 'Serverless event bus for application integration',
+    category: 'Ingestion',
+    color: '#E7157B',
+    abbrev: 'EB',
+  },
+  ec2: {
+    type: 'ec2',
+    label: 'EC2 Instance',
+    desc: 'Virtual server compute capacity in the cloud',
+    category: 'Compute',
+    color: '#FF9900',
+    abbrev: 'EC2',
+  },
+  ecs: {
+    type: 'ecs',
+    label: 'ECS Service',
+    desc: 'Managed container orchestration using Docker',
+    category: 'Compute',
+    color: '#FF9900',
+    abbrev: 'ECS',
+  },
+  eks: {
+    type: 'eks',
+    label: 'EKS Cluster',
+    desc: 'Managed Kubernetes service for container workloads',
+    category: 'Compute',
+    color: '#FF9900',
+    abbrev: 'EKS',
+  },
   lambda: {
     type: 'lambda',
     label: 'Lambda Function',
@@ -72,6 +112,30 @@ export const NODE_REGISTRY: Record<NodeType, NodeRegistryItem> = {
     category: 'Storage',
     color: '#8C4FFF',
     abbrev: 'RED',
+  },
+  vpc: {
+    type: 'vpc',
+    label: 'VPC Network',
+    desc: 'Isolated virtual network for AWS resources',
+    category: 'Networking',
+    color: '#248814',
+    abbrev: 'VPC',
+  },
+  apigateway: {
+    type: 'apigateway',
+    label: 'API Gateway',
+    desc: 'Managed REST/WebSocket API endpoint',
+    category: 'Networking',
+    color: '#A166FF',
+    abbrev: 'API',
+  },
+  cloudfront: {
+    type: 'cloudfront',
+    label: 'CloudFront CDN',
+    desc: 'Global content delivery network with edge caching',
+    category: 'Networking',
+    color: '#8C4FFF',
+    abbrev: 'CF',
   },
   iam: {
     type: 'iam',
@@ -121,8 +185,10 @@ export function getSidebarGroups(): Array<{
 }> {
   const categories: SidebarGroupCategory[] = [
     'Ingestion',
+    'Compute',
     'Processing',
     'Storage',
+    'Networking',
     'Security',
     'Observability',
   ];
@@ -132,3 +198,4 @@ export function getSidebarGroups(): Array<{
     items: Object.values(NODE_REGISTRY).filter((item) => item.category === category),
   }));
 }
+
