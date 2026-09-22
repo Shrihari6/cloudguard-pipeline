@@ -5,12 +5,15 @@ import com.cloudguard.backend.dto.CanvasMetricsResponseDTO;
 import com.cloudguard.backend.dto.ChatMessageDTO;
 import com.cloudguard.backend.dto.ChatResponseDTO;
 import com.cloudguard.backend.dto.NodeMetricsDTO;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
@@ -44,6 +47,25 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final MockRemediationAgentService fallbackService = new MockRemediationAgentService();
+
+    /**
+     * Logs the Groq API key status at startup so Render logs immediately show
+     * whether the integration is live or falling back to the mock service.
+     */
+    @PostConstruct
+    void validateApiKeyOnStartup() {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("[GROQ] GROQ_API_KEY environment variable is NOT SET. "
+                    + "All chat/remediation requests will use the mock fallback service.");
+        } else if (apiKey.startsWith("gsk_your")) {
+            log.warn("[GROQ] GROQ_API_KEY is still the placeholder value. "
+                    + "Set a real key in Render → Environment Variables → GROQ_API_KEY.");
+        } else {
+            log.info("[GROQ] API key configured — prefix: {}... (length: {}). Live mode active.",
+                    apiKey.trim().substring(0, Math.min(10, apiKey.trim().length())),
+                    apiKey.trim().length());
+        }
+    }
 
     // ─── RemediationAgentService: suggestRemediations ────────────────────────────
 
@@ -261,7 +283,7 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            log.debug("Calling Groq API with {} messages (model: {})", messages.size(), MODEL_ID);
+            log.info("[GROQ] Sending request — model: {}, messages: {}", MODEL_ID, messages.size());
             ResponseEntity<Map> response = restTemplate.exchange(
                     GROQ_API_URL, HttpMethod.POST, entity, Map.class);
 
@@ -272,16 +294,33 @@ public class GroqRemediationAgentService implements RemediationAgentService {
                     Map<String, Object> message =
                             (Map<String, Object>) choices.get(0).get("message");
                     String content = (String) message.get("content");
-                    log.info("Groq API call succeeded — model: {}, response length: {} chars",
+                    log.info("[GROQ] Success — model: {}, response: {} chars",
                             MODEL_ID, content != null ? content.length() : 0);
                     return content;
                 }
+                log.warn("[GROQ] Unexpected response body — no choices array. Body: {}",
+                        response.getBody());
+            } else {
+                log.warn("[GROQ] Non-200 response: status={}, body={}",
+                        response.getStatusCode(), response.getBody());
             }
 
-            log.warn("Groq API returned unexpected response structure: status={}",
-                    response.getStatusCode());
+        } catch (HttpClientErrorException e) {
+            // 4xx errors from Groq (e.g. 401 invalid_api_key, 429 rate_limit)
+            log.error("[GROQ] HTTP {} {} — Groq rejected the request.",
+                    e.getStatusCode().value(), e.getStatusText());
+            log.error("[GROQ] Response body from Groq: {}", e.getResponseBodyAsString());
+            e.printStackTrace();
+
+        } catch (RestClientException e) {
+            // Network errors, timeouts, DNS failures
+            log.error("[GROQ] Network/transport error reaching {}: {}", GROQ_API_URL, e.getMessage());
+            e.printStackTrace();
+
         } catch (Exception e) {
-            log.error("Groq API call failed: {}", e.getMessage(), e);
+            // Unexpected errors (NPE, ClassCast on response shape, etc.)
+            log.error("[GROQ] Unexpected error in callGroq: {}", e.getMessage());
+            e.printStackTrace();
         }
         return null;
     }
@@ -290,10 +329,11 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
     /**
      * Returns {@code true} if a real Groq API key is configured (not blank or placeholder).
+     * Trims the key before all checks to guard against accidental whitespace in env vars.
      */
     private boolean isApiKeyConfigured() {
-        return apiKey != null
-                && !apiKey.isBlank()
-                && !apiKey.startsWith("gsk_your");
+        if (apiKey == null) return false;
+        String trimmed = apiKey.trim();
+        return !trimmed.isBlank() && !trimmed.startsWith("gsk_your");
     }
 }

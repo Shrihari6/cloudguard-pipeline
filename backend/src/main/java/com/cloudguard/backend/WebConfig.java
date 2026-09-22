@@ -14,26 +14,23 @@ public class WebConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        
+
         // Use allowedOriginPatterns instead of allowedOrigins to support credentials
         config.setAllowedOriginPatterns(List.of(
-            "https://*.vercel.app",
-            "https://cloudguard-pipeline-jade.vercel.app",
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://localhost:8080",
-            "http://localhost:8081"
-        ));
-        
+                "https://*.vercel.app",
+                "https://cloudguard-pipeline-jade.vercel.app",
+                "http://127.0.0.1:*",
+                "http://localhost:*"));
+
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        
+
         return new CorsFilter(source);
     }
 }
-
