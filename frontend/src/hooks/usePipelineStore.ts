@@ -27,7 +27,10 @@ import { NODE_REGISTRY } from '@/lib/nodeRegistry';
 import { getChecksForNode } from '@/lib/securityRules';
 import { layoutPipeline } from '@/lib/layoutPipeline';
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081').replace(/\/+$/, '');
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL && process.env.NEXT_PUBLIC_API_BASE_URL !== 'undefined'
+    ? process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/+$/, '')
+    : 'https://cloudguard-pipeline.onrender.com';
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
