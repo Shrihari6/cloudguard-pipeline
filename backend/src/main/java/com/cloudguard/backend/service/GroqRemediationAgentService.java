@@ -39,11 +39,14 @@ public class GroqRemediationAgentService implements RemediationAgentService {
     private static final Logger log = LoggerFactory.getLogger(GroqRemediationAgentService.class);
 
     private static final String GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String MODEL_ID = "llama-3.3-70b-versatile";
+    private static final String DEFAULT_MODEL = "llama3-70b-8192";
     private static final int MAX_HISTORY_MESSAGES = 20;
 
     @Value("${groq.api-key:}")
     private String apiKey;
+
+    @Value("${groq.model:llama3-70b-8192}")
+    private String modelId = System.getenv().getOrDefault("GROQ_MODEL", DEFAULT_MODEL);
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final MockRemediationAgentService fallbackService = new MockRemediationAgentService();
@@ -61,9 +64,10 @@ public class GroqRemediationAgentService implements RemediationAgentService {
             log.warn("[GROQ] GROQ_API_KEY is still the placeholder value. "
                     + "Set a real key in Render → Environment Variables → GROQ_API_KEY.");
         } else {
-            log.info("[GROQ] API key configured — prefix: {}... (length: {}). Live mode active.",
+            log.info("[GROQ] API key configured — prefix: {}... (length: {}). Model: {}. Live mode active.",
                     apiKey.trim().substring(0, Math.min(10, apiKey.trim().length())),
-                    apiKey.trim().length());
+                    apiKey.trim().length(),
+                    getModel());
         }
     }
 
@@ -285,14 +289,14 @@ public class GroqRemediationAgentService implements RemediationAgentService {
             headers.setBearerAuth(apiKey.trim());
 
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", MODEL_ID);
+            body.put("model", getModel());
             body.put("messages", messages);
             body.put("temperature", 0.4);
             body.put("max_tokens", 1024);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            log.info("[GROQ] Sending request — model: {}, messages: {}", MODEL_ID, messages.size());
+            log.info("[GROQ] Sending request — model: {}, messages: {}", getModel(), messages.size());
             ResponseEntity<Map> response = restTemplate.exchange(
                     GROQ_API_URL, HttpMethod.POST, entity, Map.class);
 
@@ -304,7 +308,7 @@ public class GroqRemediationAgentService implements RemediationAgentService {
                             (Map<String, Object>) choices.get(0).get("message");
                     String content = (String) message.get("content");
                     log.info("[GROQ] Success — model: {}, response: {} chars",
-                            MODEL_ID, content != null ? content.length() : 0);
+                            getModel(), content != null ? content.length() : 0);
                     return content;
                 }
                 log.warn("[GROQ] Unexpected response body — no choices array. Body: {}",
@@ -352,5 +356,12 @@ public class GroqRemediationAgentService implements RemediationAgentService {
         if (apiKey == null) return false;
         String trimmed = apiKey.trim();
         return !trimmed.isBlank() && !trimmed.startsWith("gsk_your");
+    }
+
+    /**
+     * Returns the active Groq model identifier.
+     */
+    private String getModel() {
+        return (modelId != null && !modelId.isBlank()) ? modelId.trim() : DEFAULT_MODEL;
     }
 }
