@@ -5,6 +5,7 @@ export const TopBar: React.FC = () => {
   const {
     clearCanvas,
     triggerAutoLayout,
+    autoFixPipeline,
     nodes,
     isValidating,
     metricsResponse,
@@ -20,6 +21,10 @@ export const TopBar: React.FC = () => {
   const handleValidate = async () => {
     setActivePanelView('CHAT');
     await sendChatMessage('System: Validating current pipeline topology...', true);
+  };
+
+  const handleAutoFix = async () => {
+    await autoFixPipeline();
   };
 
   return (
@@ -45,16 +50,33 @@ export const TopBar: React.FC = () => {
 
         {/* Global Overview Score Badge */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-400"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+            scorePercent === 100
+              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-xs'
+              : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+          }`}
           title={`Overall Security Posture Score: ${scorePercent}%`}
         >
           <span>{totalPassed} / {totalPossible} 🛡️</span>
-          <span className="text-[10px] text-blue-300/80">({scorePercent}%)</span>
+          <span className={`text-[10px] ${scorePercent === 100 ? 'text-emerald-300' : 'text-blue-300/80'}`}>
+            ({scorePercent}%)
+          </span>
         </div>
       </div>
 
       {/* Right Action buttons */}
       <div className="flex items-center gap-2">
+        {/* ⚡ Auto-Fix 100% Safe Architecture Button */}
+        <button
+          onClick={handleAutoFix}
+          disabled={nodes.length === 0 || isValidating || isChatLoading}
+          title="Automatically link IAM, KMS, & CloudWatch and rearrange to 100% safe architecture"
+          className="px-3 py-1 text-xs rounded-md bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-blue-500/20 hover:from-amber-500/30 hover:via-emerald-500/30 hover:to-blue-500/30 border border-amber-500/40 hover:border-emerald-400/60 text-amber-200 hover:text-white font-semibold transition-all shadow-xs hover:shadow-emerald-900/20 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <span className="text-amber-400 animate-pulse">⚡</span>
+          <span>Auto-Fix</span>
+        </button>
+
         <button
           onClick={triggerAutoLayout}
           disabled={nodes.length === 0}

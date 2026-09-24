@@ -50,6 +50,14 @@ public class GroqRemediationAgentService implements RemediationAgentService {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final MockRemediationAgentService fallbackService = new MockRemediationAgentService();
+    private final DomainGuardrailService domainGuardrailService;
+    private final RateLimiterService rateLimiterService;
+
+    public GroqRemediationAgentService(DomainGuardrailService domainGuardrailService,
+                                       RateLimiterService rateLimiterService) {
+        this.domainGuardrailService = domainGuardrailService != null ? domainGuardrailService : new DomainGuardrailService();
+        this.rateLimiterService = rateLimiterService != null ? rateLimiterService : new RateLimiterService();
+    }
 
     /**
      * Logs the Groq API key status at startup so Render logs immediately show
@@ -119,6 +127,29 @@ public class GroqRemediationAgentService implements RemediationAgentService {
             CanvasMetricsResponseDTO metrics,
             CanvasGraphDTO graph,
             List<ChatMessageDTO> history) {
+
+        // 1. Rate Limiting Check (Zero Tokens Consumed)
+        if (!rateLimiterService.allowRequest("global-client")) {
+            log.warn("[RATE LIMIT] Request frequency exceeded rate limit threshold. Preserving tokens.");
+            return new ChatResponseDTO(
+                    rateLimiterService.getRateLimitExceededMessage(),
+                    List.of("Wait a moment", "Validate Pipeline")
+            );
+        }
+
+        // 2. Pre-LLM Domain Guardrail Check (Zero Tokens Consumed)
+        if (!domainGuardrailService.isDomainRelevant(userMessage)) {
+            log.info("[GUARDRAIL] Intercepted off-topic query: '{}'. Saved 100% LLM tokens.", userMessage);
+            return new ChatResponseDTO(
+                    domainGuardrailService.getOffTopicRefusalMessage(),
+                    List.of(
+                            "⚡ Auto-Fix Architecture",
+                            "Explain KMS Key Policy",
+                            "Why does Kinesis need an IAM Role connected?",
+                            "Validate Pipeline"
+                    )
+            );
+        }
 
         if (!isApiKeyConfigured()) {
             log.info("Groq API key not configured — delegating to mock service");
@@ -201,12 +232,17 @@ public class GroqRemediationAgentService implements RemediationAgentService {
                 - **L2 — Encryption (KMS):** Every storage/stream node must connect to a KMS Key.
                 - **L3 — Observability (CloudWatch):** Every compute/database node must connect to CloudWatch.
 
-                ## Response Formatting
+                ## 3. Strict Domain Boundaries & Security Guardrails
+                - You are STRICTLY an AWS Cloud Security & Architecture Copilot.
+                - NEVER answer questions about celebrities, actors, movies, entertainment, sports, politics, recipes, or general trivia.
+                - If the user asks about an off-topic subject (e.g., "What is the height of Salman Khan?"), politely decline and state that you only answer AWS, Cloud Computing, and Security Pipeline questions.
+
+                ## Response Formatting (Clean Markdown & Code Structure)
+                - Structure answers with clear numbered steps (e.g. `1.`, `2.`, `3.`) or bullet points (•).
+                - When providing CLI commands, Terraform code, or JSON policies, ALWAYS wrap them in proper multi-line code blocks with explicit language tags (e.g. ```bash\naws rds ...\n``` or ```json\n...\n```).
+                - Use inline `code` for resource names, parameters, and ARNs.
                 - Use **bold** for key terms and service names.
-                - Use bullet points (•) for lists.
-                - Keep responses concise — aim for 3–6 bullet points per answer.
-                - Use inline `code` for AWS resource names, ARNs, and CLI commands.
-                - Never return raw JSON or unformatted walls of text.
+                - Keep responses clean, elegant, and structured. Never output broken backticks or raw unformatted code walls.
                 """.formatted(canvasNodes, passed, possible, scorePercent, failedCount);
     }
 

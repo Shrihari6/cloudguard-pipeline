@@ -1,98 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePipelineStore } from '@/hooks/usePipelineStore';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
 const DEFAULT_WIDTH = 360;
 
 const DEFAULT_QUICK_ACTIONS = [
+  '⚡ Auto-Fix Architecture',
   'Why did my score drop?',
   'How do I fix L2 Encryption?',
   'Explain KMS Key Policy',
   'Why does Kinesis need an IAM Role connected?',
 ];
-
-/**
- * Format markdown text into styled React elements (bold, bullet points, headers, inline code).
- */
-const renderFormattedMessage = (text: string) => {
-  const lines = text.split('\n');
-
-  return lines.map((line, lineIdx) => {
-    if (!line.trim()) {
-      return <div key={lineIdx} className="h-2" />;
-    }
-
-    // Heading format (e.g. ### or ##)
-    if (line.startsWith('### ') || line.startsWith('## ') || line.startsWith('# ')) {
-      const headingText = line.replace(/^#+\s*/, '');
-      return (
-        <h4 key={lineIdx} className="font-semibold text-xs text-blue-300 mt-2 mb-1">
-          {headingText}
-        </h4>
-      );
-    }
-
-    // Bullet items
-    const isBullet = line.startsWith('• ') || line.startsWith('- ') || line.startsWith('* ');
-    const isNumbered = /^\d+\.\s/.test(line);
-
-    // Parse inline bolding **text** and inline code `code`
-    const parseSpans = (raw: string) => {
-      const parts = raw.split(/(\*\*.*?\*\*|`.*?`)/g);
-      return parts.map((part, pIdx) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return (
-            <strong key={pIdx} className="font-semibold text-gray-100">
-              {part.slice(2, -2)}
-            </strong>
-          );
-        }
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return (
-            <code
-              key={pIdx}
-              className="px-1 py-0.5 rounded bg-black/40 text-blue-300 font-mono text-[10px] border border-white/5"
-            >
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-        return part;
-      });
-    };
-
-    if (isBullet) {
-      const content = line.replace(/^[•\-*]\s*/, '');
-      return (
-        <div key={lineIdx} className="flex items-start gap-1.5 ml-1 my-0.5 text-gray-300 text-xs">
-          <span className="text-blue-400 font-bold shrink-0">•</span>
-          <span>{parseSpans(content)}</span>
-        </div>
-      );
-    }
-
-    if (isNumbered) {
-      const numMatch = line.match(/^(\d+\.)\s*(.*)$/);
-      if (numMatch) {
-        return (
-          <div key={lineIdx} className="flex items-start gap-1.5 ml-1 my-0.5 text-gray-300 text-xs">
-            <span className="text-blue-400 font-semibold font-mono text-[11px] shrink-0">
-              {numMatch[1]}
-            </span>
-            <span>{parseSpans(numMatch[2])}</span>
-          </div>
-        );
-      }
-    }
-
-    return (
-      <p key={lineIdx} className="text-xs text-gray-300 leading-relaxed my-0.5">
-        {parseSpans(line)}
-      </p>
-    );
-  });
-};
 
 export const InspectorPanel: React.FC = () => {
   const {
@@ -103,6 +23,7 @@ export const InspectorPanel: React.FC = () => {
     metricsResponse,
     isValidating,
     validatePipeline,
+    autoFixPipeline,
     chatMessages,
     isChatLoading,
     sendChatMessage,
@@ -333,15 +254,27 @@ export const InspectorPanel: React.FC = () => {
               {selectedNode.data.desc}
             </p>
 
-            <button
-              onClick={() => {
-                setActivePanelView('CHAT');
-                sendChatMessage(`Explain security compliance for ${selectedNode.data.label} (${selectedNode.data.type}) on the canvas.`);
-              }}
-              className="mt-2.5 w-full py-1 text-[10px] font-medium text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-md transition-colors flex items-center justify-center gap-1 cursor-pointer"
-            >
-              <span>💬 Ask Copilot about this node</span>
-            </button>
+            <div className="flex items-center gap-1.5 mt-2.5">
+              <button
+                onClick={() => autoFixPipeline(selectedNode.id)}
+                disabled={isValidating || isChatLoading}
+                className="flex-1 py-1.5 text-[10px] font-semibold text-amber-200 hover:text-white bg-gradient-to-r from-amber-500/20 to-emerald-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 hover:border-emerald-400/60 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
+                title="Automatically attach required IAM, KMS, or CloudWatch connections to make this node 100% compliant"
+              >
+                <span className="text-amber-400 animate-pulse">⚡</span>
+                <span>Auto-Fix Node</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActivePanelView('CHAT');
+                  sendChatMessage(`Explain security compliance for ${selectedNode.data.label} (${selectedNode.data.type}) on the canvas.`);
+                }}
+                className="flex-1 py-1.5 text-[10px] font-medium text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-md transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <span>💬 Ask Copilot</span>
+              </button>
+            </div>
           </div>
 
           {/* 3-Layer Metrics */}
@@ -483,7 +416,7 @@ export const InspectorPanel: React.FC = () => {
                   {isUser ? (
                     <p className="whitespace-pre-wrap">{msg.text}</p>
                   ) : (
-                    <div>{renderFormattedMessage(msg.text)}</div>
+                    <MarkdownRenderer content={msg.text} />
                   )}
 
                   {/* Contextual Suggested Actions inside assistant message */}
